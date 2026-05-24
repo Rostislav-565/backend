@@ -21,4 +21,12 @@ export class ApplicationsController {
   findOne(@Param('id') id: string) {
     return this.applicationsService.findOne(+id);
   }
+
+  @Patch(':id')
+  updateStatus(
+    @Param('id') id: string,
+    @Body('status') status: string
+  ) {
+      return this.applicationsService.updateStatus(+id, status);
+  }
 }

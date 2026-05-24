@@ -18,13 +18,22 @@ export class ApplicationsService {
 
   async findAll() {
     return this.prisma.application.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { 
+        createdAt: 'desc' 
+      },
     });
   }
 
   async findOne(id: number) {
     return this.prisma.application.findUnique({
       where: { id },
+    });
+  }
+
+  async updateStatus(id: number, status: any) {
+    return this.prisma.application.update({
+      where: { id: id },
+      data: { status: status },
     });
   }
 }
