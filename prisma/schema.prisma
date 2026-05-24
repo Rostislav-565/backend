@@ -14,6 +14,7 @@ enum ApplicationStatus {
   CANCELLED
 }
 
+// Таблица заявок
 model Application {
   id Int @id @default(autoincrement())
   name String   
@@ -21,4 +22,63 @@ model Application {
   course String 
   status ApplicationStatus @default(NEW)
   createdAt DateTime @default(now()) 
+}
+
+// Роли пользователей в системе
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+  GUEST
+}
+
+// Главная таблица для авторизации
+model User {
+  id Int @id @default(autoincrement())
+  email String @unique
+  password String
+  role Role @default(GUEST)
+  createdAt DateTime @default(now())
+  studentProfile StudentProfile?
+  instructorProfile InstructorProfile?
+}
+
+// Профиль КУРСАНТА
+model StudentProfile {
+  id Int @id @default(autoincrement())
+  userId Int @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  firstName String
+  lastName String
+  phone String
+  avatarUrl String?
+  docUrl String?
+
+  groupId Int
+  group Group @relation(fields: [groupId], references: [id])
+  balance Float @default(0)
+}
+
+// Профиль ИНСТРУКТОРА
+model InstructorProfile {
+  id Int @id @default(autoincrement())
+  userId Int @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  firstName String
+  lastName String
+  phone String
+  avatarUrl String? 
+  
+  carModel String
+  carNumber String
+  experience Int
+}
+
+// Таблица Учебных Групп
+model Group {
+  id Int @id @default(autoincrement())
+  name String @unique
+  students StudentProfile[]
 }
