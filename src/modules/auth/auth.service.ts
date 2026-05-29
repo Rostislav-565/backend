@@ -87,7 +87,7 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
-    if (!password) {
+    if (!isPasswordValid) {
       throw new BadRequestException('Неверный Email или пароль');
     }
 
