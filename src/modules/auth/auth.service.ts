@@ -73,4 +73,31 @@ export class AuthService {
       email: newUser.email,
     }
   }
+
+  async loginUser(dto: any) {
+    const { email, password } = dto;
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Неверный Email или пароль');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!password) {
+      throw new BadRequestException('Неверный Email или пароль');
+    }
+
+    return {
+      message: 'Вход успешно выполнен',
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      }
+    }
+  }
 }

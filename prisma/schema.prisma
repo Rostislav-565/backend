@@ -7,24 +7,6 @@ datasource db {
   url = env("DATABASE_URL")
 }
 
-enum ApplicationStatus {
-  NEW
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-// Таблица заявок
-model Application {
-  id Int @id @default(autoincrement())
-  name String   
-  phone String
-  course String 
-  status ApplicationStatus @default(NEW)
-  createdAt DateTime @default(now()) 
-}
-
-// Роли пользователей в системе
 enum Role {
   ADMIN
   INSTRUCTOR
@@ -32,7 +14,19 @@ enum Role {
   GUEST
 }
 
-// Главная таблица для авторизации
+enum ApplicationStatus {
+  NEW
+  IN_PROGRESS
+  APPROVED
+  CANCELLED
+}
+
+enum LessonStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id Int @id @default(autoincrement())
   email String @unique
@@ -43,42 +37,83 @@ model User {
   instructorProfile InstructorProfile?
 }
 
-// Профиль КУРСАНТА
+model Application {
+  id Int @id @default(autoincrement())
+  name String
+  phone String
+  course String
+  status ApplicationStatus @default(NEW)
+  createdAt DateTime @default(now())
+}
+
+model Course {
+  id Int @id @default(autoincrement())
+  name String @unique
+  description String?
+  price Float @default(0)
+  groups Group[]
+}
+
+model Group {
+  id Int @id @default(autoincrement())
+  name String @unique
+  courseId Int
+  course Course @relation(fields: [courseId], references: [id])
+  theoryInstructorId Int?
+  theoryInstructor InstructorProfile? @relation("TheoryTeacher", fields: [theoryInstructorId], references: [id])
+  students StudentProfile[]
+  startDate DateTime?
+  endDate DateTime?
+}
+
+model InstructorProfile {
+  id Int @id @default(autoincrement())
+  userId Int @unique
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String
+  lastName String
+  phone String
+  avatarUrl String?
+  carModel String
+  carNumber String
+  experience Int
+  theoryGroups Group[] @relation("TheoryTeacher")
+  drivingLessons DrivingLesson[]
+}
+
 model StudentProfile {
   id Int @id @default(autoincrement())
   userId Int @unique
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   firstName String
   lastName String
   phone String
   avatarUrl String?
   docUrl String?
-
-  groupId Int
-  group Group @relation(fields: [groupId], references: [id])
+  groupId Int?
+  group Group? @relation(fields: [groupId], references: [id])
   balance Float @default(0)
+  drivingLessons DrivingLesson[]
+  payments Payment[]
 }
 
-// Профиль ИНСТРУКТОРА
-model InstructorProfile {
+model DrivingLesson {
   id Int @id @default(autoincrement())
-  userId Int @unique
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  firstName String
-  lastName String
-  phone String
-  avatarUrl String? 
-  
-  carModel String
-  carNumber String
-  experience Int
+  startTime DateTime
+  endTime DateTime
+  status LessonStatus @default(SCHEDULED)
+  instructorId Int
+  instructor InstructorProfile @relation(fields: [instructorId], references: [id])
+  studentId Int
+  student StudentProfile @relation(fields: [studentId], references: [id])
+  notes String?
 }
 
-// Таблица Учебных Групп
-model Group {
+model Payment {
   id Int @id @default(autoincrement())
-  name String @unique
-  students StudentProfile[]
+  studentId Int
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount Float
+  date DateTime @default(now())
+  description String?
 }

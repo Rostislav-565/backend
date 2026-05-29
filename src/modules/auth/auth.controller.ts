@@ -14,4 +14,14 @@ export class AuthController {
   async register(@Body() dto: any) {
     return this.authService.registerUser(dto);
   }
+
+  @Post('login')
+  async login(@Body() dto: any) {
+    try {
+      return await this.authService.loginUser(dto);
+    } catch (error) {
+      console.error('Ошибка при входе:', error);
+      throw error;
+    }
+  }
 }
