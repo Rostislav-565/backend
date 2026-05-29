@@ -62,6 +62,7 @@ export class AuthService {
         email: email.toLowerCase().trim(),
         password: hashedPassword,
         role: 'GUEST',
+        name: name,
       },
     });
 
@@ -97,6 +98,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         role: user.role,
+        name: user.name,
       }
     }
   }
