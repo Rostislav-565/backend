@@ -10,10 +10,26 @@ export class UsersController {
     return this.usersService.getAllUsers();
   }
 
+  @Get('instructors')
+  async getInstructors() {
+    return this.usersService.getInstructors();
+  }
+
+  @Get('students')
+  async getStudents() {
+    return this.usersService.getStudents();
+  }
+
   @Patch(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateData: { email: string; role: any }
+    @Body() updateData: { 
+      email: string; 
+      role: any; 
+      phone?: string; 
+      carModel?: string; 
+      carNumber?: string 
+    }
   ) {
     return this.usersService.updateUser(id, updateData);
   }

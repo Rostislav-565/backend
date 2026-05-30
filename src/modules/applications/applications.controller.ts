@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
 import { ApplicationsService } from './applications.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
@@ -28,5 +28,13 @@ export class ApplicationsController {
     @Body('status') status: string
   ) {
       return this.applicationsService.updateStatus(+id, status);
+  }
+
+  @Post(':id/enroll')
+  enrollStudent(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('groupId', ParseIntPipe) groupId: number,
+  ) {
+    return this.applicationsService.enrollApplication(id, groupId);
   }
 }

@@ -7,6 +7,9 @@ import { ApplicationsModule } from './modules/applications/applications.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PrismaService } from './prisma/prisma.service';
 import { UsersModule } from './modules/users/users.module';
+import { GroupsModule } from './modules/groups/groups.module';
+import { CoursesModule } from './modules/courses/courses.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { UsersModule } from './modules/users/users.module';
     ApplicationsModule,
     AuthModule,
     UsersModule,
+    GroupsModule,
+    CoursesModule,
+    PrismaModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

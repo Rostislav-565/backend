@@ -29,17 +29,16 @@ export class UsersService {
     return { message: 'Пользователь успешно удален' };
   }
 
-  async updateUser(id: number, data: { email: string; role: any }) {
+  async updateUser(id: number, data: { email: string; role: any; phone?: string; carModel?: string; carNumber?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { studentProfile: true, instructorProfile: true },
     });
 
     if (!user) {
       throw new NotFoundException('Пользователь не найден');
     }
 
-    const upadateUser = await this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id },
       data: {
         email: data.email,
@@ -47,31 +46,70 @@ export class UsersService {
       },
     });
 
-    if (data.role === 'STUDENT' && !user.studentProfile) {
-      await this.prisma.studentProfile.create({
-        data: {
-          userId: user.id,
+    if (data.role === 'STUDENT') {
+      await this.prisma.studentProfile.upsert({
+        where: { userId: id },
+        create: {
+          userId: id,
           firstName: user.name || 'Без имени',
           lastName: '',
-          phone: '',
-        }
+          phone: data.phone || '',
+        },
+        update: {
+          phone: data.phone || '',
+        },
       });
     }
 
-    if (data.role === 'INSTRUCTOR' && !user.instructorProfile) {
-      await this.prisma.instructorProfile.create({
-        data: {
-          userId: user.id,
+    if (data.role === 'INSTRUCTOR') {
+      await this.prisma.instructorProfile.upsert({
+        where: { userId: id },
+        create: {
+          userId: id,
           firstName: user.name || 'Без имени',
           lastName: '',
-          phone: '',
-          carModel: 'Не указана',
-          carNumber: 'Не указан',
+          phone: data.phone || '',
+          carModel: data.carModel || 'Не указана',
+          carNumber: data.carNumber || 'Не указан',
           experience: 0,
-        }
+        },
+        update: {
+          phone: data.phone || '',
+          carModel: data.carModel || '',
+          carNumber: data.carNumber || '',
+        },
       });
     }
 
-    return upadateUser;
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        name: true,
+        createdAt: true,
+        studentProfile: true,
+        instructorProfile: true,
+      }
+    });
+  }
+
+  async getInstructors() {
+    return this.prisma.instructorProfile.findMany({
+      where: {
+        user: { role: 'INSTRUCTOR' }
+      },
+      orderBy: { id: 'asc' }
+    });
+  }
+
+  async getStudents() {
+    return this.prisma.studentProfile.findMany({
+      where: {
+        user: { role: 'STUDENT' }
+      },
+      orderBy: { id: 'asc' }
+    });
   }
 }
