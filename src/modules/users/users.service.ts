@@ -47,6 +47,8 @@ export class UsersService {
     });
 
     if (data.role === 'STUDENT') {
+      await this.prisma.instructorProfile.deleteMany({ where: { userId: id } });
+
       await this.prisma.studentProfile.upsert({
         where: { userId: id },
         create: {
@@ -61,7 +63,9 @@ export class UsersService {
       });
     }
 
-    if (data.role === 'INSTRUCTOR') {
+    else if (data.role === 'INSTRUCTOR') {
+      await this.prisma.studentProfile.deleteMany({ where: { userId: id } });
+
       await this.prisma.instructorProfile.upsert({
         where: { userId: id },
         create: {
@@ -79,6 +83,11 @@ export class UsersService {
           carNumber: data.carNumber || '',
         },
       });
+    }
+
+    else {
+      await this.prisma.studentProfile.deleteMany({ where: { userId: id } });
+      await this.prisma.instructorProfile.deleteMany({ where: { userId: id } });
     }
 
     return this.prisma.user.findUnique({
@@ -107,9 +116,14 @@ export class UsersService {
   async getStudents() {
     return this.prisma.studentProfile.findMany({
       where: {
-        user: { role: 'STUDENT' }
+        user: { role: 'STUDENT' } 
       },
-      orderBy: { id: 'asc' }
+      include: {
+        user: {
+          select: { email: true }
+        }
+      },
+      orderBy: { lastName: 'asc' }
     });
   }
 }
