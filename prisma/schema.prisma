@@ -27,6 +27,19 @@ enum LessonStatus {
   CANCELLED
 }
 
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  SBP
+  TRANSFER
+}
+
 model User {
   id Int @id @default(autoincrement())
   name String?
@@ -51,7 +64,7 @@ model Course {
   id Int @id @default(autoincrement())
   name String @unique
   description String?
-  price Float @default(0)
+  price Decimal @default(0) @db.Decimal(10, 2)
   groups Group[]
 }
 
@@ -93,7 +106,7 @@ model StudentProfile {
   docUrl String?
   groupId Int?
   group Group? @relation(fields: [groupId], references: [id])
-  balance Float @default(0)
+  balance Decimal @default(0) @db.Decimal(10, 2)
   drivingLessons DrivingLesson[]
   payments Payment[]
 }
@@ -114,7 +127,11 @@ model Payment {
   id Int @id @default(autoincrement())
   studentId Int
   student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  amount Float
-  date DateTime @default(now())
+  amount Decimal @db.Decimal(10, 2)
+  status PaymentStatus @default(PAID)
+  method PaymentMethod
   description String?
+  createdBy Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
