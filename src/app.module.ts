@@ -11,6 +11,7 @@ import { GroupsModule } from './modules/groups/groups.module';
 import { CoursesModule } from './modules/courses/courses.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { InstructorModule } from './modules/instructor/instructor.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
     CoursesModule,
     PrismaModule,
     PaymentsModule,
+    InstructorModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
