@@ -12,6 +12,7 @@ import { CoursesModule } from './modules/courses/courses.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { InstructorModule } from './modules/instructor/instructor.module';
+import { StudentModule } from './modules/student/student.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { InstructorModule } from './modules/instructor/instructor.module';
     PrismaModule,
     PaymentsModule,
     InstructorModule,
+    StudentModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
