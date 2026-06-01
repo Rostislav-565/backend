@@ -47,16 +47,14 @@ export class InstructorService {
 
   async getLessons(userId: number) {
     const profile = await this.getInstructorProfile(userId);
-
-    const lessons = await this.prisma.lesson.findMany({
+    return this.prisma.lesson.findMany({
       where: { instructorId: profile.id },
       include: {
         student: { select: { firstName: true, lastName: true } },
-        group: { select: { name: true } }
+        group: { select: { name: true } },
+        attendance: true
       }
     });
-
-    return lessons;
   }
 
   async createLesson(userId: number, dto: CreateLessonDto) {
@@ -101,34 +99,36 @@ export class InstructorService {
   async updateLesson(userId: number, lessonId: number, dto: any) {
     const profile = await this.getInstructorProfile(userId);
 
-    if (dto.startTime && dto.endTime) {
-      const overlap = await this.prisma.lesson.findFirst({
-        where: {
-          instructorId: profile.id,
-          status: 'SCHEDULED',
-          id: { not: Number(lessonId) },
-          AND: [
-            { startTime: { lt: new Date(dto.endTime) } },
-            { endTime: { gt: new Date(dto.startTime) } }
-          ]
-        }
-      });
-      if (overlap) throw new ConflictException('Выбранное новое время пересекается с другим занятием!');
+    if (dto.attendance && Array.isArray(dto.attendance)) {
+      for (const record of dto.attendance) {
+        await this.prisma.attendance.upsert({
+          where: {
+            lessonId_studentId: { lessonId, studentId: record.studentId }
+          },
+          create: {
+            lessonId,
+            studentId: record.studentId,
+            isPresent: record.isPresent
+          },
+          update: {
+            isPresent: record.isPresent
+          }
+        });
+      }
     }
 
     return this.prisma.lesson.update({
-      where: { id: Number(lessonId) },
+      where: { id: lessonId },
       data: {
+        status: dto.status || undefined,
+        notes: dto.notes !== undefined ? dto.notes : undefined,
         startTime: dto.startTime ? new Date(dto.startTime) : undefined,
         endTime: dto.endTime ? new Date(dto.endTime) : undefined,
-        studentId: dto.studentId,
-        carModel: dto.carModel,
-        carNumber: dto.carNumber,
-        notes: dto.notes
       },
       include: {
         student: { select: { firstName: true, lastName: true } },
-        group: { select: { name: true } }
+        group: { select: { name: true } },
+        attendance: true
       }
     });
   }

@@ -117,6 +117,7 @@ model StudentProfile {
   balance Decimal @default(0) @db.Decimal(10, 2)
   payments Payment[]
   lessons Lesson[]
+  attendance Attendance[] // <-- ДОБАВЛЕНО
 }
 
 model Lesson {
@@ -136,6 +137,7 @@ model Lesson {
   group Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  attendance Attendance[] // <-- ДОБАВЛЕНО
 }
 
 model Payment {
@@ -149,4 +151,14 @@ model Payment {
   createdBy Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Attendance {
+  id Int @id @default(autoincrement())
+  lessonId Int
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  studentId Int
+  student StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  isPresent Boolean @default(true)
+  @@unique([lessonId, studentId])
 }
