@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { MailerService } from '@nestjs-modules/mailer';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
@@ -10,6 +11,7 @@ export class AuthService {
   constructor(
     private readonly mailerService: MailerService,
     private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async sendVerificationCode(email: string) {
@@ -76,31 +78,21 @@ export class AuthService {
   }
 
   async loginUser(dto: any) {
-    const { email, password } = dto;
-
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+    const user = await this.prisma.user.findFirst({
+      where: { email: { equals: dto.email, mode: 'insensitive' } },
     });
 
-    if (!user) {
+    if (!user || !(await bcrypt.compare(dto.password, user.password))) {
       throw new BadRequestException('Неверный Email или пароль');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      throw new BadRequestException('Неверный Email или пароль');
-    }
-
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    
     return {
       message: 'Вход успешно выполнен',
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        name: user.name,
-      }
-    }
+      user: { id: user.id, email: user.email, role: user.role, name: user.name },
+      token: this.jwtService.sign(payload),
+    };
   }
 
   async forgotPassword(email: string) {

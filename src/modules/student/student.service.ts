@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -6,7 +6,7 @@ export class StudentService {
   constructor(private prisma: PrismaService) {}
 
   private async getStudentProfile(userId: number) {
-    const profile = await this.prisma.studentProfile.findUnique({
+    return await this.prisma.studentProfile.findUnique({
       where: { userId },
       include: {
         user: true,
@@ -14,13 +14,26 @@ export class StudentService {
         payments: true,
       },
     });
-
-    if (!profile) throw new NotFoundException('Профиль ученика не найден');
-    return profile;
   }
 
   async getDashboard(userId: number) {
     const student = await this.getStudentProfile(userId);
+
+    if (!student) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      return {
+        fullName: user?.name || 'Новый курсант',
+        category: '—',
+        status: 'Ожидает распределения',
+        startDate: 'Не назначена',
+        endDate: 'Не назначена',
+        groupName: 'Без группы',
+        progress: { theoryAttended: 0, theoryTotal: 24, drivingAttended: 0, drivingTotal: 28 },
+        finance: { totalCost: 0, paid: 0, debt: 0, dueDate: 'Не определен' },
+        instructor: { fullName: 'Инструктор не назначен', phone: '—', car: '—' },
+        currentStep: 0,
+      };
+    }
 
     const theoryAttended = student.groupId
       ? await this.prisma.lesson.count({
@@ -43,29 +56,40 @@ export class StudentService {
     const theoryTotal = 24;
     const drivingTotal = 28;
 
-    let currentStep = 0;
-    if (drivingAttended > 0 && drivingAttended < 10) currentStep = 1; // Автодром
-    else if (drivingAttended >= 10 && drivingAttended < 25) currentStep = 2; // Город
-    else if (drivingAttended >= 25 && drivingAttended < drivingTotal) currentStep = 3; // Внутренний
-    else if (drivingAttended >= drivingTotal && theoryAttended >= theoryTotal) currentStep = 4; // ГИБДД
+let currentStep = 0;
+
+    if (drivingAttended >= drivingTotal && theoryAttended >= theoryTotal) {
+      currentStep = 4;
+    } 
+    else if (drivingAttended >= 25) {
+      currentStep = 3;
+    } 
+    else if (drivingAttended > 10) {
+      currentStep = 2;
+    } 
+    else if (drivingAttended > 0 || theoryAttended >= 2) {
+      currentStep = 1;
+    }
 
     const totalCost = student.group?.course?.price ? Number(student.group.course.price) : 45000;
     const paid = student.payments
-      .filter((p) => p.status === 'PAID')
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+      ? student.payments.filter((p) => p.status === 'PAID').reduce((sum, p) => sum + Number(p.amount), 0)
+      : 0;
     const debt = totalCost - paid;
 
     const lastDrivingLesson = await this.prisma.lesson.findFirst({
       where: { studentId: student.id, type: 'DRIVING' },
       include: { instructor: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { startTime: 'desc' }, 
     });
 
     const instructorInfo = lastDrivingLesson?.instructor
       ? {
-          fullName: `${lastDrivingLesson.instructor.lastName} ${lastDrivingLesson.instructor.firstName}`,
+          fullName: `${lastDrivingLesson.instructor.lastName || ''} ${lastDrivingLesson.instructor.firstName || ''}`.trim() || 'Инструктор',
           phone: lastDrivingLesson.instructor.phone || 'Не указан',
-          car: `${lastDrivingLesson.instructor.carModel} (${lastDrivingLesson.instructor.carNumber})`,
+          car: lastDrivingLesson.instructor.carModel 
+            ? `${lastDrivingLesson.instructor.carModel} (${lastDrivingLesson.instructor.carNumber || '—'})`
+            : '—',
         }
       : {
           fullName: 'Инструктор не назначен',
@@ -73,12 +97,18 @@ export class StudentService {
           car: '—',
         };
 
+    const formatDate = (date: any) => {
+      if (!date) return 'Не назначена';
+      const d = new Date(date);
+      return isNaN(d.getTime()) ? 'Не назначена' : d.toISOString().split('T')[0];
+    };
+
     return {
-      fullName: `${student.lastName} ${student.firstName}`,
+      fullName: student.lastName && student.firstName ? `${student.lastName} ${student.firstName}` : (student.user?.name || 'Курсант'),
       category: student.group?.course?.name.includes('A') ? 'A' : 'B',
       status: student.group ? 'Активный' : 'Ожидает группу',
-      startDate: student.group?.startDate?.toISOString().split('T')[0] || 'Не назначена',
-      endDate: student.group?.endDate?.toISOString().split('T')[0] || 'Не назначена',
+      startDate: formatDate(student.group?.startDate),
+      endDate: formatDate(student.group?.endDate),
       groupName: student.group?.name || 'Без группы',
       progress: {
         theoryAttended,
@@ -91,7 +121,7 @@ export class StudentService {
         paid,
         debt: debt > 0 ? debt : 0,
         dueDate: student.group?.endDate 
-            ? new Date(student.group.endDate.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] 
+            ? formatDate(new Date(new Date(student.group.endDate).getTime() - 14 * 24 * 60 * 60 * 1000))
             : 'Не определен',
       },
       instructor: instructorInfo,
@@ -101,6 +131,7 @@ export class StudentService {
 
   async getUpcomingLessons(userId: number) {
     const student = await this.getStudentProfile(userId);
+    if (!student) return [];
 
     const upcomingLessons = await this.prisma.lesson.findMany({
       where: {
@@ -121,8 +152,8 @@ export class StudentService {
     });
 
     return upcomingLessons.map((lesson) => {
-      const startDate = new Date(lesson.startTime);
-      const endDate = new Date(lesson.endTime);
+      const startDate = lesson.startTime ? new Date(lesson.startTime) : new Date();
+      const endDate = lesson.endTime ? new Date(lesson.endTime) : new Date();
 
       const formattedTime = `${startDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
 
@@ -131,9 +162,11 @@ export class StudentService {
         type: lesson.type,
         date: startDate.toISOString().split('T')[0],
         time: formattedTime,
-        instructorName: `${lesson.instructor.lastName} ${lesson.instructor.firstName}`,
-        carInfo: lesson.type === 'DRIVING' 
-          ? `${lesson.carModel || lesson.instructor.carModel} (${lesson.carNumber || lesson.instructor.carNumber})` 
+        instructorName: lesson.instructor 
+          ? `${lesson.instructor.lastName || ''} ${lesson.instructor.firstName || ''}`.trim() || 'Преподаватель'
+          : 'Не указан',
+        carInfo: lesson.type === 'DRIVING' && lesson.instructor
+          ? `${lesson.carModel || lesson.instructor.carModel || 'ТС'} (${lesson.carNumber || lesson.instructor.carNumber || '—'})` 
           : undefined,
         location: lesson.type === 'THEORY' ? 'Учебный класс' : 'Автодром / Город',
       };
