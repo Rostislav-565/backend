@@ -5,6 +5,11 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('stats')
+  async getDashboardStats() {
+    return this.usersService.getStats();
+  }
+
   @Get()
   async findAll() {
     return this.usersService.getAllUsers();
@@ -38,4 +43,6 @@ export class UsersController {
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.deleteUser(id);
   }
+
+  
 }

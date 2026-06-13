@@ -29,6 +29,20 @@ export class UsersService {
     return { message: 'Пользователь успешно удален' };
   }
 
+  async getStats() {
+    const [totalStudents, totalInstructors, totalGroups] = await Promise.all([
+      this.prisma.user.count({ where: { role: 'STUDENT' } }),
+      this.prisma.user.count({ where: { role: 'INSTRUCTOR' } }),
+      this.prisma.group.count()
+    ]);
+
+    return {
+      totalStudents,
+      totalInstructors,
+      totalGroups
+    };
+  }
+
   async updateUser(id: number, data: { email: string; role: any; phone?: string; carModel?: string; carNumber?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id },

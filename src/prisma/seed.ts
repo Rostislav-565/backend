@@ -1,27 +1,18 @@
 import { PrismaClient, Role, LessonType, LessonStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
-import { fakerRU as faker } from '@faker-js/faker';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// Генерация валидного телефона РФ
-const generatePhone = () => {
-  return `+7 (9${faker.string.numeric(2)}) ${faker.string.numeric(3)}-${faker.string.numeric(2)}-${faker.string.numeric(2)}`;
-};
-
-// Функция для генерации адекватного рабочего времени (с 08:00 до 19:00)
-const getRealisticWorkingDate = (baseDate: Date) => {
-  const newDate = new Date(baseDate);
-  const hour = faker.number.int({ min: 8, max: 19 });
-  const minute = faker.helpers.arrayElement([0, 30]);
-  newDate.setHours(hour, minute, 0, 0);
-  return newDate;
+const getRelativeDate = (daysOffset: number, hour: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + daysOffset);
+  date.setHours(hour, 0, 0, 0);
+  return date;
 };
 
 async function main() {
-  console.log('🌱 Очистка базы данных перед засевом...');
+  console.log('🌱 Начинаем детерминированную очистку БД...');
 
-  // Удаляем данные в строгом порядке, учитывая внешние ключи (Foreign Keys)
   await prisma.attendance.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.lesson.deleteMany();
@@ -31,251 +22,113 @@ async function main() {
   await prisma.instructorProfile.deleteMany();
   await prisma.user.deleteMany();
 
-  console.log('🔄 Старые данные успешно удалены. Генерируем новые...');
+  console.log('🔄 База чиста. Создаем идеальный презентационный набор данных...');
 
-  const defaultPassword = await bcrypt.hash('password123', 10);
+  const password123 = await bcrypt.hash('password123', 10);
 
-  // Создаем базовые курсы автошколы
-  const courseA = await prisma.course.create({ data: { name: 'Категория А (Мотоциклы)', price: 25000, description: 'Полный курс обучения вождению мотоцикла с подготовкой к экзамену в ГИБДД.' } });
-  const courseB = await prisma.course.create({ data: { name: 'Категория B (Легковые)', price: 45000, description: 'Обучение вождению легкового автомобиля (МКПП/АКПП), теория и практика.' } });
+  const courseB = await prisma.course.create({
+    data: { name: 'Категория B (Легковые)', price: 45000, description: 'Полный курс с теорией и вождением.' }
+  });
 
-  // ==========================================
-  // ТЕСТОВЫЕ АККАУНТЫ ДЛЯ ТЕБЯ (ДЛЯ ВХОДА НА ЗАЩИТЕ)
-  // ==========================================
-  
-  // 1. Главный Админ
   await prisma.user.create({
-    data: {
-      name: 'Администратор БТМСХ',
-      email: 'admin@auto.ru',
-      password: defaultPassword,
-      role: Role.ADMIN,
-    }
+    data: { name: 'Администратор БТМСХ', email: 'admin@auto.ru', password: password123, role: Role.ADMIN }
   });
 
-  // 2. Демо-Инструктор
-  const demoInstructorUser = await prisma.user.create({
+  const theoryInstructor = await prisma.user.create({
     data: {
-      name: 'Петров Петр Петрович',
-      email: 'instructor@auto.ru',
-      password: defaultPassword,
-      role: Role.INSTRUCTOR,
+      name: 'Смирнов Петр (Теория)', email: 'theory@auto.ru', password: password123, role: Role.INSTRUCTOR,
       instructorProfile: {
-        create: {
-          firstName: 'Петр',
-          lastName: 'Петров',
-          phone: '+7 (999) 111-22-33',
-          carModel: 'Hyundai Solaris',
-          carNumber: 'А123АА 777',
-          experience: 10,
-        }
+        create: { firstName: 'Петр', lastName: 'Смирнов', phone: '+7 (999) 111-11-11', carModel: 'Аудитория 101', carNumber: '-', experience: 15 }
       }
-    },
-    include: { instructorProfile: true }
+    }, include: { instructorProfile: true }
   });
 
-  // 3. Демо-Студент (СВОБОДНЫЙ, БЕЗ ГРУППЫ — для демонстрации добавления в группу!)
-  const demoStudentUser = await prisma.user.create({
+  const drivingInstructor = await prisma.user.create({
     data: {
-      name: 'Иванов Иван Иванович',
-      email: 'student@auto.ru',
-      password: defaultPassword,
-      role: Role.STUDENT,
+      name: 'Иванов Алексей (Вождение)', email: 'drive@auto.ru', password: password123, role: Role.INSTRUCTOR,
+      instructorProfile: {
+        create: { firstName: 'Алексей', lastName: 'Иванов', phone: '+7 (999) 222-22-22', carModel: 'Kia Rio', carNumber: 'А123АА 64', experience: 7 }
+      }
+    }, include: { instructorProfile: true }
+  });
+
+  const group = await prisma.group.create({
+    data: {
+      name: 'Группа Б-01/2026',
+      courseId: courseB.id,
+      theoryInstructorId: theoryInstructor.instructorProfile!.id,
+      startDate: getRelativeDate(-14, 9),
+      endDate: getRelativeDate(60, 18),
+    }
+  });
+
+  const student1 = await prisma.user.create({
+    data: {
+      name: 'Соколов Дмитрий', email: 'student1@auto.ru', password: password123, role: Role.STUDENT,
+      studentProfile: { create: { firstName: 'Дмитрий', lastName: 'Соколов', phone: '+7 (900) 000-00-01', groupId: group.id, balance: 45000 } }
+    }, include: { studentProfile: true }
+  });
+
+  const student2 = await prisma.user.create({
+    data: {
+      name: 'Попова Анна', email: 'student2@auto.ru', password: password123, role: Role.STUDENT,
+      studentProfile: { create: { firstName: 'Анна', lastName: 'Попова', phone: '+7 (900) 000-00-02', groupId: group.id, balance: 20000 } }
+    }, include: { studentProfile: true }
+  });
+
+  const freeStudent = await prisma.user.create({
+    data: {
+      name: 'Новиков Егор (Новичок)', email: 'new@auto.ru', password: password123, role: Role.STUDENT,
       studentProfile: {
-        create: {
-          firstName: 'Иван',
-          lastName: 'Иванов',
-          phone: '+7 (999) 555-44-33',
-          groupId: null, // Он свободный!
-          balance: 0,
-        }
+        create: { firstName: 'Егор', lastName: 'Новиков', phone: '+7 (999) 999-99-99', groupId: null, balance: 0 }
       }
-    },
-    include: { studentProfile: true }
+    }, include: { studentProfile: true }
   });
 
-  // Добавим демо-студенту успешную оплату
-  await prisma.payment.create({
+  await prisma.payment.create({ data: { studentId: student1.studentProfile!.id, amount: 45000, method: PaymentMethod.CARD, status: PaymentStatus.PAID, description: 'Полная оплата' } });
+  await prisma.payment.create({ data: { studentId: student2.studentProfile!.id, amount: 20000, method: PaymentMethod.SBP, status: PaymentStatus.PAID, description: 'Частичная оплата' } });
+
+  const theoryLesson1 = await prisma.lesson.create({
     data: {
-      studentId: demoStudentUser.studentProfile!.id,
-      amount: 15000,
-      method: PaymentMethod.SBP,
-      status: PaymentStatus.PAID,
-      description: 'Частичная оплата за обучение',
+      type: LessonType.THEORY,
+      startTime: getRelativeDate(-1, 18),
+      endTime: getRelativeDate(-1, 20),
+      status: LessonStatus.COMPLETED,
+      notes: 'ПДД: Знаки приоритета',
+      instructorId: theoryInstructor.instructorProfile!.id,
+      groupId: group.id,
     }
   });
 
-  // ==========================================
-  // ГЕНЕРАЦИЯ ОСТАЛЬНЫХ ДАННЫХ (ДЛЯ МАССОВОСТИ)
-  // ==========================================
+  await prisma.attendance.createMany({
+    data: [
+      { lessonId: theoryLesson1.id, studentId: student1.studentProfile!.id, isPresent: true },
+      { lessonId: theoryLesson1.id, studentId: student2.studentProfile!.id, isPresent: false },
+    ]
+  });
 
-  // Генерируем инструкторов
-  const instructors: any[] = [demoInstructorUser.instructorProfile];
-  for (let i = 0; i < 8; i++) {
-    const gender = faker.helpers.arrayElement(['male', 'female'] as const);
-    const firstName = faker.person.firstName(gender);
-    const lastName = faker.person.lastName(gender);
-    const fullName = `${lastName} ${firstName}`;
-
-    const user = await prisma.user.create({
-      data: {
-        name: fullName,
-        email: faker.internet.email({ firstName, lastName }).toLowerCase(),
-        password: defaultPassword,
-        role: Role.INSTRUCTOR,
-        instructorProfile: {
-          create: {
-            firstName,
-            lastName,
-            phone: generatePhone(),
-            carModel: faker.helpers.arrayElement(['Lada Granta', 'Renault Logan', 'Kia Rio', 'Skoda Rapid']),
-            carNumber: `${faker.string.alpha({ length: 1, casing: 'upper' })}${faker.number.int({ min: 100, max: 999 })}${faker.string.alpha({ length: 2, casing: 'upper' })} 64`,
-            experience: faker.number.int({ min: 3, max: 15 }),
-          },
-        },
-      },
-      include: { instructorProfile: true },
-    });
-    instructors.push(user.instructorProfile);
-  }
-  console.log('✅ Созданы инструкторы и их автопарк');
-
-  // Генерируем учебные группы
-  const groups: any[] = [];
-  const groupNames = ['Группа А-01/2026', 'Группа Б-01/2026', 'Группа Б-02/2026', 'Группа А-02/2026'];
-  
-  for (let i = 0; i < groupNames.length; i++) {
-    const isCategoryA = groupNames[i].includes('А');
-    const group = await prisma.group.create({
-      data: {
-        name: groupNames[i],
-        courseId: isCategoryA ? courseA.id : courseB.id,
-        theoryInstructorId: faker.helpers.arrayElement(instructors).id,
-        startDate: faker.date.recent({ days: 30 }),
-        endDate: faker.date.soon({ days: 90 }),
-      },
-    });
-    groups.push(group);
-  }
-  console.log('✅ Созданы учебные группы');
-
-  // Генерируем студентов (часть в группах, часть — свободные!)
-  const students: any[] = [demoStudentUser.studentProfile];
-  
-  for (let i = 0; i < 60; i++) {
-    const gender = faker.helpers.arrayElement(['male', 'female'] as const);
-    const firstName = faker.person.firstName(gender);
-    const lastName = faker.person.lastName(gender);
-    const fullName = `${lastName} ${firstName}`;
-
-    // КРИТИЧЕСКИЙ ФИКС: 45 студентов раскидываем по группам, а 15 оставляем без группы (groupId: null)
-    const assignToGroup = i < 45;
-    const targetGroup = assignToGroup ? faker.helpers.arrayElement(groups) : null;
-
-    const user = await prisma.user.create({
-      data: {
-        name: fullName,
-        email: faker.internet.email({ firstName, lastName }).toLowerCase(),
-        password: defaultPassword,
-        role: Role.STUDENT,
-        studentProfile: {
-          create: {
-            firstName,
-            lastName,
-            phone: generatePhone(),
-            groupId: targetGroup ? targetGroup.id : null,
-            balance: 0,
-          },
-        },
-      },
-      include: { studentProfile: true },
-    });
-    students.push(user.studentProfile);
-
-    // Добавляем студенту историю оплат
-    await prisma.payment.create({
-      data: {
-        studentId: user.studentProfile!.id,
-        amount: faker.helpers.arrayElement([15000, 25000, 45000]),
-        method: faker.helpers.arrayElement([PaymentMethod.CARD, PaymentMethod.CASH, PaymentMethod.SBP]),
-        status: PaymentStatus.PAID,
-        description: 'Оплата за обучение в автошколе',
-      },
-    });
-  }
-  console.log('✅ Созданы студенты (75% распределены по группам, 25% свободны для админки)');
-
-  // Генерируем Лекции теории для сформированных групп
-  for (const group of groups) {
-    const groupStudents = students.filter(s => s?.groupId === group.id);
-    if (groupStudents.length === 0) continue;
-
-    for (let i = 0; i < 5; i++) {
-      const rawDate = faker.date.recent({ days: 15 });
-      const lessonDate = getRealisticWorkingDate(rawDate);
-
-      const lesson = await prisma.lesson.create({
-        data: {
-          type: LessonType.THEORY,
-          startTime: lessonDate,
-          endTime: new Date(lessonDate.getTime() + 2 * 60 * 60 * 1000), // +2 часа лекция
-          status: LessonStatus.COMPLETED,
-          notes: `Теоретическое занятие. Тема №${i + 1}`,
-          instructorId: group.theoryInstructorId!,
-          groupId: group.id,
-        },
-      });
-
-      // Заполняем журнал посещаемости для этой лекции
-      for (const student of groupStudents) {
-        await prisma.attendance.create({
-          data: {
-            lessonId: lesson.id,
-            studentId: student.id,
-            isPresent: faker.number.int({ min: 1, max: 100 }) > 15, // 85% посещаемость
-          },
-        });
-      }
+  await prisma.lesson.create({
+    data: {
+      type: LessonType.DRIVING,
+      startTime: getRelativeDate(1, 10),
+      endTime: getRelativeDate(1, 11).setMinutes(30) as unknown as Date,
+      status: LessonStatus.SCHEDULED,
+      notes: 'Городской маршрут №1',
+      instructorId: drivingInstructor.instructorProfile!.id,
+      studentId: student1.studentProfile!.id,
+      carModel: drivingInstructor.instructorProfile!.carModel,
+      carNumber: drivingInstructor.instructorProfile!.carNumber,
     }
-  }
-  console.log('✅ Созданы журналы теории и посещаемости');
+  });
 
-  // Генерируем Практические занятия (Вождение) только для студентов, у которых есть группа
-  const studentsWithGroup = students.filter(s => s?.groupId !== null);
-  
-  for (const student of studentsWithGroup) {
-    const personalInstructor = faker.helpers.arrayElement(instructors);
-
-    for (let i = 0; i < 6; i++) {
-      const isPast = i < 4; // 4 занятия в прошлом (выполнены), 2 в будущем (запланированы)
-      const rawDate = isPast ? faker.date.recent({ days: 20 }) : faker.date.soon({ days: 10 });
-      const lessonDate = getRealisticWorkingDate(rawDate);
-
-      await prisma.lesson.create({
-        data: {
-          type: LessonType.DRIVING,
-          startTime: lessonDate,
-          endTime: new Date(lessonDate.getTime() + 1.5 * 60 * 60 * 1000), // 1.5 часа вождение
-          status: isPast ? LessonStatus.COMPLETED : LessonStatus.SCHEDULED,
-          notes: isPast ? 'Успешная отработка элементов на автодроме' : 'Городской маршрут №2',
-          carModel: personalInstructor.carModel,
-          carNumber: personalInstructor.carNumber,
-          instructorId: personalInstructor.id,
-          studentId: student.id,
-        },
-      });
-    }
-  }
-
-  console.log('✅ Индивидуальные занятия по вождению успешно разложены по календарям');
-  console.log('🎉 БАЗА ДАННЫХ ИДЕАЛЬНО И БЕЗОПАСНО ЗАСЕЯНА СВЯЗАННЫМИ ДАННЫМИ!');
+  console.log('✅ ИДЕАЛЬНАЯ БАЗА ДЛЯ ПРЕЗЕНТАЦИИ ГОТОВА!');
+  console.log('🔐 Доступы:');
+  console.log('Админ: admin@auto.ru | Пароль: password123');
+  console.log('Инструктор по вождению: drive@auto.ru');
+  console.log('Ученик с расписанием: student1@auto.ru');
+  console.log('Свободный ученик (для тестов): new@auto.ru');
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Ошибка во время засева:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });
