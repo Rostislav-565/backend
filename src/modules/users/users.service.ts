@@ -13,7 +13,9 @@ export class UsersService {
         role: true,
         name: true,
         createdAt: true,
-        studentProfile: true,
+        studentProfile: {
+          include: { group: true }
+        },
         instructorProfile: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -43,7 +45,7 @@ export class UsersService {
     };
   }
 
-  async updateUser(id: number, data: { email: string; role: any; phone?: string; carModel?: string; carNumber?: string }) {
+  async updateUser(id: number, data: { name: string; email: string; role: any; phone?: string; carModel?: string; carNumber?: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
@@ -56,6 +58,7 @@ export class UsersService {
       where: { id },
       data: {
         email: data.email,
+        name: data.name,
         role: data.role,
       },
     });

@@ -29,6 +29,7 @@ export class UsersController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateData: { 
+      name: string;
       email: string; 
       role: any; 
       phone?: string; 
