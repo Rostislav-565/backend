@@ -107,11 +107,14 @@ async function main() {
     ]
   });
 
+  const endTime = getRelativeDate(1, 11);
+endTime.setMinutes(30);
+
   await prisma.lesson.create({
     data: {
       type: LessonType.DRIVING,
       startTime: getRelativeDate(1, 10),
-      endTime: getRelativeDate(1, 11).setMinutes(30) as unknown as Date,
+      endTime: endTime,
       status: LessonStatus.SCHEDULED,
       notes: 'Городской маршрут №1',
       instructorId: drivingInstructor.instructorProfile!.id,
