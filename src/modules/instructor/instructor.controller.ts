@@ -1,20 +1,34 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Req, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { InstructorService } from './instructor.service';
 import { CreateLessonDto } from './dto/lesson.dto';
-
-
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('instructor')
+@UseGuards(AuthGuard('jwt'))
 export class InstructorController {
   constructor(private readonly instructorService: InstructorService) {}
 
   private getUserId(req: any): number {
-    return req?.user?.id || 3; 
+    const userId = req?.user?.id;
+    if (!userId) {
+      throw new UnauthorizedException('Пользователь не авторизован');
+    }
+    return userId; 
   }
 
   @Get('profile')
   getProfile(@Req() req: any) {
     return this.instructorService.getProfile(this.getUserId(req));
+  }
+
+  @Get('all-driving')
+  getAllDrivingInstructors() {
+    return this.instructorService.getAllDrivingInstructors();
+  }
+
+  @Get('all-students')
+  getAllStudents() {
+    return this.instructorService.getAllStudents();
   }
 
   @Get('theory-group')

@@ -98,7 +98,7 @@ model InstructorProfile {
   lastName String
   phone String
   avatarUrl String?
-  carModel String
+  carModel String?
   carNumber String
   experience Int
   theoryGroups Group[] @relation("TheoryTeacher")

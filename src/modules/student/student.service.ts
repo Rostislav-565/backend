@@ -10,7 +10,12 @@ export class StudentService {
       where: { userId },
       include: {
         user: true,
-        group: { include: { course: true } },
+        group: { 
+          include: { 
+            course: true,
+            theoryInstructor: true
+          } 
+        },
         payments: true,
       },
     });
@@ -56,7 +61,7 @@ export class StudentService {
     const theoryTotal = 24;
     const drivingTotal = 28;
 
-let currentStep = 0;
+    let currentStep = 0;
 
     if (drivingAttended >= drivingTotal && theoryAttended >= theoryTotal) {
       currentStep = 4;
@@ -77,18 +82,14 @@ let currentStep = 0;
       : 0;
     const debt = totalCost - paid;
 
-    const lastDrivingLesson = await this.prisma.lesson.findFirst({
-      where: { studentId: student.id, type: 'DRIVING' },
-      include: { instructor: true },
-      orderBy: { startTime: 'desc' }, 
-    });
+    const groupInstructor = student.group?.theoryInstructor;
 
-    const instructorInfo = lastDrivingLesson?.instructor
+    const instructorInfo = groupInstructor
       ? {
-          fullName: `${lastDrivingLesson.instructor.lastName || ''} ${lastDrivingLesson.instructor.firstName || ''}`.trim() || 'Инструктор',
-          phone: lastDrivingLesson.instructor.phone || 'Не указан',
-          car: lastDrivingLesson.instructor.carModel 
-            ? `${lastDrivingLesson.instructor.carModel} (${lastDrivingLesson.instructor.carNumber || '—'})`
+          fullName: `${groupInstructor.lastName || ''} ${groupInstructor.firstName || ''}`.trim(),
+          phone: groupInstructor.phone || 'Не указан',
+          car: groupInstructor.carModel && groupInstructor.carModel !== 'Не назначено'
+            ? `${groupInstructor.carModel} (${groupInstructor.carNumber || '—'})`
             : '—',
         }
       : {
@@ -105,7 +106,7 @@ let currentStep = 0;
 
     return {
       fullName: student.lastName && student.firstName ? `${student.lastName} ${student.firstName}` : (student.user?.name || 'Курсант'),
-      category: student.group?.course?.name.includes('A') ? 'A' : 'B',
+      category: student.group?.course?.name ? student.group.course.name.replace('Категория ', '') : '—',
       status: student.group ? 'Активный' : 'Ожидает группу',
       startDate: formatDate(student.group?.startDate),
       endDate: formatDate(student.group?.endDate),

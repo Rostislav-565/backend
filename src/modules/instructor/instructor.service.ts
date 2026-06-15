@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateLessonDto } from './dto/lesson.dto';
 
@@ -12,9 +12,25 @@ export class InstructorService {
     return profile;
   }
 
+  async getAllStudents() {
+    return this.prisma.studentProfile.findMany({
+      select: { id: true, firstName: true, lastName: true, phone: true },
+      orderBy: { lastName: 'asc' }
+    });
+  }
+
+  async getAllDrivingInstructors() {
+    return this.prisma.instructorProfile.findMany({
+      where: {
+        carModel: { not: { in: ["", "Не указан", "Не назначено", "Не назначен"] } },
+      },
+      select: { id: true, firstName: true, lastName: true, carModel: true, carNumber: true },
+      orderBy: { lastName: 'asc' }
+    });
+  }
+
   async getProfile(userId: number) {
     const profile = await this.getInstructorProfile(userId);
-    
     const total = await this.prisma.lesson.count({ where: { instructorId: profile.id } });
     const completed = await this.prisma.lesson.count({ where: { instructorId: profile.id, status: 'COMPLETED' } });
     const attendanceRate = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -31,26 +47,30 @@ export class InstructorService {
 
   async getTheoryGroup(userId: number) {
     const profile = await this.getInstructorProfile(userId);
-
-    const group = await this.prisma.group.findFirst({
+    return this.prisma.group.findFirst({
       where: { theoryInstructorId: profile.id },
       include: {
         course: { select: { name: true, description: true } },
         students: { select: { id: true, firstName: true, lastName: true, phone: true } }
       }
     });
-
-    if (!group) return null;
-
-    return group;
   }
 
   async getLessons(userId: number) {
     const profile = await this.getInstructorProfile(userId);
+    const group = await this.prisma.group.findFirst({ where: { theoryInstructorId: profile.id } });
+
     return this.prisma.lesson.findMany({
-      where: { instructorId: profile.id },
+      where: {
+        status: { not: 'CANCELLED' },
+        OR: [
+          { instructorId: profile.id }, // Уроки, где этот человек - инструктор
+          group ? { student: { groupId: group.id } } : { id: -1 } // Уроки студентов его группы (у любых инструкторов)
+        ]
+      },
       include: {
-        student: { select: { firstName: true, lastName: true } },
+        student: { select: { id: true, firstName: true, lastName: true } },
+        instructor: { select: { firstName: true, lastName: true } },
         group: { select: { name: true } },
         attendance: true
       }
@@ -58,61 +78,80 @@ export class InstructorService {
   }
 
   async createLesson(userId: number, dto: CreateLessonDto) {
-    const profile = await this.getInstructorProfile(userId);
+    const creator = await this.prisma.instructorProfile.findUnique({ where: { userId } });
+    if (!creator) throw new ForbiddenException('Доступ запрещен');
 
-    const overlap = await this.prisma.lesson.findFirst({
+    const targetInstructorId = dto.instructorId || creator.id;
+
+    // ВАЖНОЕ ИСПРАВЛЕНИЕ: Формируем точные условия, без пустых объектов {}
+    const orConditions: any[] = [{ instructorId: targetInstructorId }];
+    if (dto.studentId) {
+      orConditions.push({ studentId: dto.studentId });
+    }
+
+    const overlappingLesson = await this.prisma.lesson.findFirst({
       where: {
-        instructorId: profile.id,
-        status: 'SCHEDULED',
-        AND: [
-          { startTime: { lt: new Date(dto.endTime) } },
-          { endTime: { gt: new Date(dto.startTime) } }
-        ]
+        status: { not: 'CANCELLED' },
+        startTime: { lt: new Date(dto.endTime) },
+        endTime: { gt: new Date(dto.startTime) },
+        OR: orConditions
       }
     });
 
-    if (overlap) {
-      throw new ConflictException('Данное время или автомобиль уже заняты!');
+    if (overlappingLesson) {
+      throw new ConflictException('Данное время уже занято инструктором или выбранным курсантом!');
     }
 
-    const newLesson = await this.prisma.lesson.create({
+    return this.prisma.lesson.create({
       data: {
-        instructorId: profile.id,
         type: dto.type,
         startTime: new Date(dto.startTime),
         endTime: new Date(dto.endTime),
-        studentId: dto.studentId,
-        groupId: dto.groupId,
+        instructorId: targetInstructorId,
+        studentId: dto.studentId || null,
+        groupId: dto.groupId || null,
         carModel: dto.carModel,
         carNumber: dto.carNumber,
-        notes: dto.notes
-      },
-      include: {
-        student: { select: { firstName: true, lastName: true } },
-        group: { select: { name: true } }
+        notes: dto.notes,
       }
     });
-
-    return newLesson;
   }
 
   async updateLesson(userId: number, lessonId: number, dto: any) {
-    const profile = await this.getInstructorProfile(userId);
+    if (dto.startTime && dto.endTime) {
+      const existingLesson = await this.prisma.lesson.findUnique({ where: { id: lessonId } });
+      if (!existingLesson) throw new NotFoundException('Занятие не найдено');
+
+      const actualInstructorId = dto.instructorId || existingLesson.instructorId;
+      const actualStudentId = dto.studentId || existingLesson.studentId;
+
+      // ВАЖНОЕ ИСПРАВЛЕНИЕ ДЛЯ РЕДАКТИРОВАНИЯ
+      const orConditions: any[] = [{ instructorId: actualInstructorId }];
+      if (actualStudentId) {
+        orConditions.push({ studentId: actualStudentId });
+      }
+
+      const overlappingLesson = await this.prisma.lesson.findFirst({
+        where: {
+          id: { not: lessonId },
+          status: { not: 'CANCELLED' },
+          startTime: { lt: new Date(dto.endTime) },
+          endTime: { gt: new Date(dto.startTime) },
+          OR: orConditions
+        }
+      });
+
+      if (overlappingLesson) {
+        throw new ConflictException('Выбранное новое время пересекается с другим занятием!');
+      }
+    }
 
     if (dto.attendance && Array.isArray(dto.attendance)) {
       for (const record of dto.attendance) {
         await this.prisma.attendance.upsert({
-          where: {
-            lessonId_studentId: { lessonId, studentId: record.studentId }
-          },
-          create: {
-            lessonId,
-            studentId: record.studentId,
-            isPresent: record.isPresent
-          },
-          update: {
-            isPresent: record.isPresent
-          }
+          where: { lessonId_studentId: { lessonId, studentId: record.studentId } },
+          create: { lessonId, studentId: record.studentId, isPresent: record.isPresent },
+          update: { isPresent: record.isPresent }
         });
       }
     }
@@ -124,6 +163,10 @@ export class InstructorService {
         notes: dto.notes !== undefined ? dto.notes : undefined,
         startTime: dto.startTime ? new Date(dto.startTime) : undefined,
         endTime: dto.endTime ? new Date(dto.endTime) : undefined,
+        instructorId: dto.instructorId || undefined,
+        studentId: dto.studentId || undefined,
+        carModel: dto.carModel || undefined,
+        carNumber: dto.carNumber || undefined,
       },
       include: {
         student: { select: { firstName: true, lastName: true } },
@@ -134,13 +177,8 @@ export class InstructorService {
   }
 
   async deleteLesson(userId: number, lessonId: number) {
-    const profile = await this.getInstructorProfile(userId);
-    const lesson = await this.prisma.lesson.findFirst({
-      where: { id: Number(lessonId), instructorId: profile.id }
-    });
-    
+    const lesson = await this.prisma.lesson.findFirst({ where: { id: Number(lessonId) } });
     if (!lesson) throw new NotFoundException('Занятие не найдено');
-
     await this.prisma.lesson.delete({ where: { id: Number(lessonId) } });
     return { success: true, message: 'Занятие отменено' };
   }
