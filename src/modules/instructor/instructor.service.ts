@@ -36,6 +36,7 @@ export class InstructorService {
     const attendanceRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return {
+      id: profile.id,
       firstName: profile.firstName,
       lastName: profile.lastName,
       experience: profile.experience,
