@@ -2,7 +2,7 @@
 
 Масштабируемый и безопасный REST API сервер, обеспечивающий бизнес-логику, разграничение прав доступа и управление реляционной базой данных информационной системы автошколы ГАПОУ СО «БТМСХ».
 
-🔗 **Репозиторий фронтенда:** [Rostislav-565/diplom](https://github.com/Rostislav-565/diplom)
+🔗 **Репозиторий фронтенда:** [Rostislav-565/auto-school-crm](https://github.com/Rostislav-565/auto-school-crm)
 
 ## 🛠 Стек технологий
 * **Фреймворк:** NestJS (Node.js) с модульной архитектурой (Modules, Controllers, Services)
@@ -21,5 +21,5 @@
 
 ### 1. Клонирование репозитория
 ```bash
-git clone [https://github.com/Rostislav-565/backend.git](https://github.com/Rostislav-565/backend.git)
+git clone https://github.com/Rostislav-565/backend.git
 cd backend
